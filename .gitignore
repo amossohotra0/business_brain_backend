@@ -1,0 +1,9 @@
+venv
+venv-test
+.env
+.env*
+__pycache__
+*.sql
+run_test.py
+temp_uploads
+temp_audio
