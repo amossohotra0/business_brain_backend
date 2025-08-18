@@ -1,0 +1,773 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Document Intelligence API with Gmail Integration",
+    "description": "Comprehensive API for document upload, OCR, note-taking, audio transcription, semantic search, conversation management, and Gmail integration with real-time notifications",
+    "version": "1.3.0",
+    "contact": {
+      "name": "API Support",
+      "email": "support@example.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Development server"
+    },
+    {
+      "url": "https://api.example.com",
+      "description": "Production server"
+    }
+  ],
+  "paths": {
+    "/api/v1/gmail/auth": {
+      "get": {
+        "tags": ["Gmail"],
+        "summary": "Start Gmail OAuth",
+        "description": "Initiate Gmail OAuth flow for user authentication. Redirects to Google OAuth consent screen.",
+        "operationId": "start_gmail_oauth",
+        "security": [{"HTTPBearer": []}],
+        "responses": {
+          "302": {
+            "description": "Redirect to Google OAuth consent screen"
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing authentication token",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error - Missing OAuth configuration",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/gmail/oauth2callback": {
+      "get": {
+        "tags": ["Gmail"],
+        "summary": "Gmail OAuth Callback",
+        "description": "Handle Gmail OAuth callback and save user credentials. Called automatically by Google after user consent.",
+        "operationId": "gmail_oauth_callback",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "description": "OAuth authorization code from Google",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": true,
+            "description": "User ID passed in OAuth state parameter",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully authenticated with Gmail",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/GmailAuthResponse"}
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - Invalid callback parameters",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/gmail/emails": {
+      "get": {
+        "tags": ["Gmail"],
+        "summary": "List User Emails",
+        "description": "Get paginated list of user's emails from database with filtering and sorting options.",
+        "operationId": "list_user_emails",
+        "security": [{"HTTPBearer": []}],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Number of emails to retrieve (1-100)",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "description": "Number of emails to skip for pagination",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved emails",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/EmailListResponse"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/gmail/emails/{email_id}": {
+      "get": {
+        "tags": ["Gmail"],
+        "summary": "Get Email Details",
+        "description": "Get detailed information about a specific email. Automatically marks email as read when viewed.",
+        "operationId": "get_email_details",
+        "security": [{"HTTPBearer": []}],
+        "parameters": [
+          {
+            "name": "email_id",
+            "in": "path",
+            "required": true,
+            "description": "Internal email ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved email details",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/EmailDetailResponse"}
+              }
+            }
+          },
+          "404": {
+            "description": "Email not found",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/gmail/emails/{email_id}/star": {
+      "post": {
+        "tags": ["Gmail"],
+        "summary": "Star/Unstar Email",
+        "description": "Toggle star status of an email. Stars help users mark important emails for quick access.",
+        "operationId": "toggle_email_star",
+        "security": [{"HTTPBearer": []}],
+        "parameters": [
+          {
+            "name": "email_id",
+            "in": "path",
+            "required": true,
+            "description": "Internal email ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully updated star status",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/EmailStarResponse"}
+              }
+            }
+          },
+          "404": {
+            "description": "Email not found",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/gmail/sync": {
+      "post": {
+        "tags": ["Gmail"],
+        "summary": "Sync Emails",
+        "description": "Manually sync recent emails from Gmail. Useful for initial sync or when automatic sync fails.",
+        "operationId": "sync_gmail_emails",
+        "security": [{"HTTPBearer": []}],
+        "parameters": [
+          {
+            "name": "max_results",
+            "in": "query",
+            "required": false,
+            "description": "Maximum number of emails to sync (1-100)",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully synced emails",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/EmailSyncResponse"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized or Gmail not connected",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "500": {
+            "description": "Sync failed",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/gmail/watch": {
+      "post": {
+        "tags": ["Gmail"],
+        "summary": "Start Email Watch",
+        "description": "Start watching emails for push notifications. Enables real-time email notifications via webhooks.",
+        "operationId": "start_email_watch",
+        "security": [{"HTTPBearer": []}],
+        "responses": {
+          "200": {
+            "description": "Successfully started watching emails",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/GmailWatchResponse"}
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized or Gmail not connected",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to start email watching",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/gmail/webhook": {
+      "post": {
+        "tags": ["Gmail"],
+        "summary": "Gmail Webhook",
+        "description": "Handle Gmail push notifications for new emails. This endpoint is called automatically by Google Cloud Pub/Sub when new emails arrive.",
+        "operationId": "handle_gmail_webhook",
+        "requestBody": {
+          "required": true,
+          "description": "Gmail push notification payload from Google Cloud Pub/Sub",
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/GmailWebhookPayload"}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successfully processed webhook",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/WebhookResponse"}
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid webhook payload",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/gmail/ws/{user_id}": {
+      "get": {
+        "tags": ["Gmail"],
+        "summary": "WebSocket Connection",
+        "description": "WebSocket endpoint for real-time email notifications. Establishes persistent connection for live updates.",
+        "operationId": "gmail_websocket",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "description": "User ID for WebSocket connection",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "101": {
+            "description": "WebSocket connection established"
+          },
+          "400": {
+            "description": "Invalid WebSocket request"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "GmailAuthResponse": {
+        "type": "object",
+        "required": ["status", "message"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Authentication status",
+            "example": "success"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Connected Gmail email address",
+            "example": "user@gmail.com"
+          },
+          "message": {
+            "type": "string",
+            "description": "Status message",
+            "example": "Gmail connected successfully"
+          }
+        }
+      },
+      "EmailAttachment": {
+        "type": "object",
+        "required": ["filename", "mime_type", "size"],
+        "properties": {
+          "filename": {
+            "type": "string",
+            "description": "Attachment filename",
+            "example": "document.pdf"
+          },
+          "mime_type": {
+            "type": "string",
+            "description": "MIME type of the attachment",
+            "example": "application/pdf"
+          },
+          "size": {
+            "type": "integer",
+            "description": "Size of the attachment in bytes",
+            "example": 12345
+          },
+          "attachment_id": {
+            "type": "string",
+            "description": "Gmail attachment ID for downloading",
+            "example": "ANGjdJ8w..."
+          }
+        }
+      },
+      "EmailResponse": {
+        "type": "object",
+        "required": ["id", "gmail_id", "is_read", "is_starred", "size_estimate", "created_at"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Internal email ID",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "gmail_id": {
+            "type": "string",
+            "description": "Gmail message ID",
+            "example": "17c9b9e4f8a1b2c3"
+          },
+          "thread_id": {
+            "type": "string",
+            "nullable": true,
+            "description": "Gmail thread ID",
+            "example": "17c9b9e4f8a1b2c3"
+          },
+          "subject": {
+            "type": "string",
+            "nullable": true,
+            "description": "Email subject",
+            "example": "Important Meeting Tomorrow"
+          },
+          "from_email": {
+            "type": "string",
+            "nullable": true,
+            "description": "Sender email address",
+            "example": "sender@example.com"
+          },
+          "to_email": {
+            "type": "string",
+            "nullable": true,
+            "description": "Recipient email address",
+            "example": "recipient@example.com"
+          },
+          "date": {
+            "type": "string",
+            "nullable": true,
+            "description": "Email date string from headers",
+            "example": "Mon, 1 Jan 2024 10:00:00 +0000"
+          },
+          "readable_date": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Parsed email date",
+            "example": "2024-01-01T10:00:00Z"
+          },
+          "snippet": {
+            "type": "string",
+            "nullable": true,
+            "description": "Email snippet/preview",
+            "example": "Hi there, I wanted to remind you about..."
+          },
+          "body_text": {
+            "type": "string",
+            "nullable": true,
+            "description": "Plain text body content"
+          },
+          "body_html": {
+            "type": "string",
+            "nullable": true,
+            "description": "HTML body content"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/EmailAttachment"},
+            "description": "Email attachments"
+          },
+          "is_read": {
+            "type": "boolean",
+            "description": "Whether email has been read",
+            "example": false
+          },
+          "is_starred": {
+            "type": "boolean",
+            "description": "Whether email is starred",
+            "example": false
+          },
+          "size_estimate": {
+            "type": "integer",
+            "description": "Estimated size in bytes",
+            "example": 1024
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When email was saved to database",
+            "example": "2024-01-01T10:00:00Z"
+          }
+        }
+      },
+      "EmailDetailResponse": {
+        "allOf": [
+          {"$ref": "#/components/schemas/EmailResponse"},
+          {
+            "type": "object",
+            "properties": {
+              "cc_email": {
+                "type": "string",
+                "nullable": true,
+                "description": "CC email addresses",
+                "example": "cc@example.com"
+              },
+              "bcc_email": {
+                "type": "string",
+                "nullable": true,
+                "description": "BCC email addresses",
+                "example": "bcc@example.com"
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Complete email headers",
+                "example": {
+                  "Message-ID": "<abc123@gmail.com>",
+                  "Return-Path": "sender@example.com"
+                }
+              },
+              "labels": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Gmail labels",
+                "example": ["INBOX", "IMPORTANT"]
+              }
+            }
+          }
+        ]
+      },
+      "EmailListResponse": {
+        "type": "object",
+        "required": ["emails", "total", "unread_count"],
+        "properties": {
+          "emails": {
+            "type": "array",
+            "items": {"$ref": "#/components/schemas/EmailResponse"},
+            "description": "List of emails"
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total number of emails",
+            "example": 150
+          },
+          "unread_count": {
+            "type": "integer",
+            "description": "Number of unread emails",
+            "example": 5
+          }
+        }
+      },
+      "EmailStarResponse": {
+        "type": "object",
+        "required": ["starred", "message"],
+        "properties": {
+          "starred": {
+            "type": "boolean",
+            "description": "New starred status",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "Status message",
+            "example": "Email starred"
+          }
+        }
+      },
+      "EmailSyncResponse": {
+        "type": "object",
+        "required": ["message", "synced_count"],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Sync status message",
+            "example": "Synced 15 emails"
+          },
+          "synced_count": {
+            "type": "integer",
+            "description": "Number of emails synced",
+            "example": 15
+          }
+        }
+      },
+      "GmailWatchResponse": {
+        "type": "object",
+        "required": ["status"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Watch status",
+            "example": "watch_started"
+          },
+          "expiration": {
+            "type": "string",
+            "nullable": true,
+            "description": "Watch expiration timestamp",
+            "example": "1640995200000"
+          }
+        }
+      },
+      "WebhookResponse": {
+        "type": "object",
+        "required": ["status"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Webhook processing status",
+            "enum": ["received", "no_data", "user_not_found", "already_exists", "save_failed", "error"],
+            "example": "received"
+          },
+          "email_saved": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Whether email was saved to database",
+            "example": true
+          },
+          "email_id": {
+            "type": "string",
+            "nullable": true,
+            "description": "Saved email ID",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true,
+            "description": "Error message if processing failed"
+          }
+        }
+      },
+      "GmailWebhookPayload": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": {
+            "type": "object",
+            "required": ["data"],
+            "properties": {
+              "data": {
+                "type": "string",
+                "description": "Base64 encoded Gmail notification data",
+                "example": "eyJlbWFpbEFkZHJlc3MiOiJ1c2VyQGdtYWlsLmNvbSJ9"
+              },
+              "messageId": {
+                "type": "string",
+                "description": "Pub/Sub message ID"
+              },
+              "publishTime": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When the message was published"
+              }
+            }
+          },
+          "subscription": {
+            "type": "string",
+            "description": "Pub/Sub subscription name"
+          }
+        }
+      },
+      "WebSocketMessage": {
+        "type": "object",
+        "required": ["type", "data"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Message type",
+            "enum": ["new_email", "connection_established", "heartbeat"],
+            "example": "new_email"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Message data",
+            "example": {
+              "id": "550e8400-e29b-41d4-a716-446655440000",
+              "subject": "New Email Arrived",
+              "from_email": "sender@example.com",
+              "snippet": "You have a new message..."
+            }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["detail"],
+        "properties": {
+          "detail": {
+            "type": "string",
+            "description": "Error message",
+            "example": "Email not found"
+          },
+          "error_code": {
+            "type": "string",
+            "nullable": true,
+            "description": "Specific error code for programmatic handling",
+            "example": "EMAIL_NOT_FOUND"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT token obtained from login endpoint"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Gmail",
+      "description": "Gmail integration endpoints for email management, OAuth authentication, and real-time notifications"
+    }
+  ]
+}
