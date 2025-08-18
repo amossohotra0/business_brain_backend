@@ -38,7 +38,8 @@ websocket_connections: Dict[str, WebSocket] = {}
 # Gmail OAuth scopes
 GMAIL_SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/userinfo.email"
+    "https://www.googleapis.com/auth/userinfo.email",
+    "openid"
 ]
 
 # ===== Authentication Helper =====
@@ -46,10 +47,24 @@ async def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depend
     """Extract user ID from JWT token."""
     token = credentials.credentials
     payload = verify_token(token)
-    user_id = payload.get("user_id") or payload.get("sub")
-    if user_id is None:
+    user_identifier = payload.get("user_id") or payload.get("sub") or payload.get("email")
+    
+    if user_identifier is None:
         raise HTTPException(status_code=401, detail="Could not validate credentials")
-    return user_id
+    
+    # If user_identifier is an email, find the corresponding user_id in database
+    if "@" in str(user_identifier):
+        try:
+            result = supabase.table('users').select('id').eq('email', user_identifier).execute()
+            if result.data:
+                return result.data[0]['id']
+            else:
+                raise HTTPException(status_code=401, detail="User not found")
+        except Exception as e:
+            logger.error(f"Error finding user by email {user_identifier}: {e}")
+            raise HTTPException(status_code=401, detail="Could not validate user")
+    
+    return user_identifier
 
 # ===== Database Helper Functions =====
 async def get_user_gmail_token(user_id: str) -> Optional[Dict]:
@@ -298,7 +313,10 @@ async def notify_new_email(user_id: str, email_data: Dict):
         500: {"model": ErrorResponse, "description": "Internal server error"}
     }
 )
-async def google_auth(user_id: str = Depends(get_current_user_id)):
+async def google_auth(
+    user_id: str = Depends(get_current_user_id),
+    email: Optional[str] = Query(None, description="Gmail address to connect (optional)")
+):
     """Start Gmail OAuth flow."""
     try:
         flow = Flow.from_client_config(
@@ -315,12 +333,19 @@ async def google_auth(user_id: str = Depends(get_current_user_id)):
         )
         flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
 
-        auth_url, _ = flow.authorization_url(
-            access_type="offline",
-            prompt="consent",
-            include_granted_scopes="true",
-            state=user_id  # Pass user_id in state
-        )
+        # Build OAuth parameters
+        oauth_params = {
+            "access_type": "offline",
+            "prompt": "select_account consent",  # Force account selection
+            "include_granted_scopes": "true",
+            "state": user_id  # Pass user_id in state
+        }
+        
+        # Add login hint if email provided
+        if email:
+            oauth_params["login_hint"] = email
+            
+        auth_url, _ = flow.authorization_url(**oauth_params)
         return RedirectResponse(auth_url)
     except Exception as e:
         logger.error(f"Error starting Gmail OAuth: {e}")

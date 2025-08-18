@@ -1,0 +1,85 @@
+INFO:     Will watch for changes in these directories: ['/Users/savvyprogrammers/Desktop/Projects/Brain_style/Brain Byte Backend']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [46391] using WatchFiles
+INFO:     Started server process [46398]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:57399 - "OPTIONS /api/v1/documents/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57400 - "OPTIONS /api/v1/notes/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57401 - "OPTIONS /api/v1/audio/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57399 - "GET /api/v1/documents/ HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:57403 - "GET /api/v1/notes/ HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:57400 - "GET /api/v1/audio/ HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:57400 - "GET /api/v1/conversations/ HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:57518 - "OPTIONS /api/v1/auth/login HTTP/1.1" 200 OK
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/savvyprogrammers/Desktop/Projects/Brain_style/Brain Byte Backend/venv/lib/python3.12/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+INFO:     127.0.0.1:57518 - "POST /api/v1/auth/login HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:58008 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58016 - "GET /api/v1/gmail/emails?limit=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58026 - "POST /api/v1/gmail/sync?max_results=1 HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:58028 - "GET /api/v1/gmail/auth HTTP/1.1" 307 Temporary Redirect
+WARNING:  WatchFiles detected changes in 'email_connection_test.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [46398]
+INFO:     Started server process [48206]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/savvyprogrammers/Desktop/Projects/Brain_style/Brain Byte Backend/venv/lib/python3.12/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+INFO:     127.0.0.1:58735 - "POST /api/v1/auth/login HTTP/1.1" 200 OK
+Error getting user emails: The read operation timed out
+INFO:     127.0.0.1:58746 - "GET /api/v1/gmail/emails?limit=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58768 - "POST /api/v1/gmail/sync?max_results=1 HTTP/1.1" 401 Unauthorized
+Error finding user by email mzrbutt31@gmail.com: The read operation timed out
+INFO:     127.0.0.1:58781 - "GET /api/v1/gmail/auth HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:58824 - "POST /api/v1/auth/login HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:59186 - "POST /api/v1/auth/login HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:59593 - "POST /api/v1/auth/login HTTP/1.1" 500 Internal Server Error
+WARNING:  WatchFiles detected changes in 'complete_email_test.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [48206]
+INFO:     Started server process [51035]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'fix_gmail_oauth.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [51035]
+INFO:     Started server process [51117]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'test_oauth_flow.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [51117]
+INFO:     Started server process [51634]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/api/google_gmail.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [51634]
+INFO:     Started server process [52059]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [52059]
+INFO:     Stopping reloader process [46391]
