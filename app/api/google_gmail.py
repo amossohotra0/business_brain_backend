@@ -270,6 +270,49 @@ async def notify_new_email(user_id: str, email_data: Dict):
             print(f"Error sending WebSocket message: {e}")
             websocket_connections.pop(user_id, None)
 
+# ===== Connection Status Endpoint =====
+@router.get("/status", 
+    summary="Check Gmail Connection Status",
+    description="Check if user has Gmail connected",
+    responses={
+        200: {"description": "Connection status retrieved"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"}
+    }
+)
+async def get_gmail_status(user_id: str = Depends(get_current_user_id)):
+    """Check Gmail connection status for user."""
+    try:
+        token_data = await get_user_gmail_token(user_id)
+        if token_data and token_data.get('refresh_token'):
+            return {
+                "connected": True,
+                "email_address": token_data.get('email_address'),
+                "connected_at": token_data.get('updated_at')
+            }
+        else:
+            return {"connected": False}
+    except Exception as e:
+        logger.error(f"Error checking Gmail status: {e}")
+        return {"connected": False}
+
+@router.delete("/disconnect", 
+    summary="Disconnect Gmail",
+    description="Disconnect Gmail account for user",
+    responses={
+        200: {"description": "Successfully disconnected"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"}
+    }
+)
+async def disconnect_gmail(user_id: str = Depends(get_current_user_id)):
+    """Disconnect Gmail account for user."""
+    try:
+        # Delete Gmail tokens
+        result = supabase.table('gmail_tokens').delete().eq('user_id', user_id).execute()
+        return {"message": "Gmail account disconnected successfully"}
+    except Exception as e:
+        logger.error(f"Error disconnecting Gmail: {e}")
+        raise HTTPException(status_code=500, detail="Failed to disconnect Gmail")
+
 # ===== OAuth Endpoints =====
 @router.get("/auth", 
     summary="Start Gmail OAuth",
