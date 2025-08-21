@@ -1,0 +1,315 @@
+{
+  "gmail_integration_api": {
+    "base_url": "http://localhost:8000/api/v1/gmail",
+    "authentication": {
+      "type": "Bearer Token",
+      "header": "Authorization: Bearer {jwt_token}",
+      "note": "All endpoints except callback require JWT token"
+    },
+    "endpoints": {
+      "1_start_oauth": {
+        "method": "GET",
+        "url": "/auth",
+        "full_url": "http://localhost:8000/api/v1/gmail/auth",
+        "description": "Start Gmail OAuth flow with optional email selection",
+        "headers": {
+          "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        },
+        "query_params": {
+          "email": "user@gmail.com (optional - pre-selects Gmail account)"
+        },
+        "request_example": {
+          "curl": "curl -X GET 'http://localhost:8000/api/v1/gmail/auth?email=user@gmail.com' -H 'Authorization: Bearer {token}'",
+          "javascript": "fetch('/api/v1/gmail/auth?email=user@gmail.com', { headers: { 'Authorization': 'Bearer ' + token } })"
+        },
+        "response": {
+          "status_code": 302,
+          "description": "Redirects to Google OAuth consent screen",
+          "headers": {
+            "Location": "https://accounts.google.com/o/oauth2/auth?response_type=code&client_id=..."
+          }
+        }
+      },
+      "2_oauth_callback": {
+        "method": "GET",
+        "url": "/oauth2callback",
+        "full_url": "http://localhost:8000/api/v1/gmail/oauth2callback",
+        "description": "Handle OAuth callback (automatic)",
+        "query_params": {
+          "code": "4/0AX4XfWh...",
+          "state": "user_id_here"
+        },
+        "response_success": {
+          "status_code": 200,
+          "body": {
+            "status": "success",
+            "email": "user@gmail.com",
+            "message": "Gmail connected successfully"
+          }
+        },
+        "response_error": {
+          "status_code": 400,
+          "body": {
+            "detail": "Authorization code is required"
+          }
+        }
+      },
+      "3_list_emails": {
+        "method": "GET",
+        "url": "/emails",
+        "full_url": "http://localhost:8000/api/v1/gmail/emails",
+        "description": "Get paginated list of user emails",
+        "headers": {
+          "Authorization": "Bearer {jwt_token}"
+        },
+        "query_params": {
+          "limit": "20 (optional, 1-100)",
+          "offset": "0 (optional, 0+)"
+        },
+        "request_example": {
+          "curl": "curl -X GET 'http://localhost:8000/api/v1/gmail/emails?limit=20&offset=0' -H 'Authorization: Bearer {token}'",
+          "javascript": "fetch('/api/v1/gmail/emails?limit=20&offset=0', { headers: { 'Authorization': 'Bearer ' + token } })"
+        },
+        "response_success": {
+          "status_code": 200,
+          "body": {
+            "emails": [
+              {
+                "id": "email_123",
+                "gmail_id": "17a2b3c4d5e6f7g8",
+                "thread_id": "17a2b3c4d5e6f7g8",
+                "subject": "Important Meeting Tomorrow",
+                "from_email": "boss@company.com",
+                "to_email": "user@gmail.com",
+                "date": "2024-01-15T10:30:00Z",
+                "readable_date": "2024-01-15T10:30:00",
+                "snippet": "Hi, I wanted to remind you about our meeting...",
+                "body_text": "Hi, I wanted to remind you about our meeting tomorrow at 2 PM.",
+                "body_html": "<p>Hi, I wanted to remind you about our meeting tomorrow at 2 PM.</p>",
+                "attachments": [
+                  {
+                    "filename": "agenda.pdf",
+                    "mime_type": "application/pdf",
+                    "size": 12345,
+                    "attachment_id": "att_123"
+                  }
+                ],
+                "is_read": false,
+                "is_starred": false,
+                "size_estimate": 2048,
+                "created_at": "2024-01-15T10:30:00Z"
+              }
+            ],
+            "total": 150,
+            "unread_count": 25
+          }
+        }
+      },
+      "4_get_email_detail": {
+        "method": "GET",
+        "url": "/emails/{email_id}",
+        "full_url": "http://localhost:8000/api/v1/gmail/emails/email_123",
+        "description": "Get detailed email information",
+        "headers": {
+          "Authorization": "Bearer {jwt_token}"
+        },
+        "path_params": {
+          "email_id": "email_123"
+        },
+        "request_example": {
+          "curl": "curl -X GET 'http://localhost:8000/api/v1/gmail/emails/email_123' -H 'Authorization: Bearer {token}'",
+          "javascript": "fetch('/api/v1/gmail/emails/email_123', { headers: { 'Authorization': 'Bearer ' + token } })"
+        },
+        "response_success": {
+          "status_code": 200,
+          "body": {
+            "id": "email_123",
+            "gmail_id": "17a2b3c4d5e6f7g8",
+            "thread_id": "17a2b3c4d5e6f7g8",
+            "subject": "Important Meeting Tomorrow",
+            "from_email": "boss@company.com",
+            "to_email": "user@gmail.com",
+            "cc_email": "team@company.com",
+            "bcc_email": "",
+            "date": "Mon, 15 Jan 2024 10:30:00 +0000",
+            "readable_date": "2024-01-15T10:30:00",
+            "snippet": "Hi, I wanted to remind you about our meeting...",
+            "body_text": "Hi, I wanted to remind you about our meeting tomorrow at 2 PM. Please bring the quarterly reports.",
+            "body_html": "<p>Hi,</p><p>I wanted to remind you about our meeting tomorrow at 2 PM.</p><p>Please bring the quarterly reports.</p>",
+            "attachments": [],
+            "headers": {
+              "Message-ID": "<abc123@gmail.com>",
+              "Subject": "Important Meeting Tomorrow",
+              "From": "boss@company.com",
+              "To": "user@gmail.com"
+            },
+            "labels": ["INBOX", "IMPORTANT"],
+            "is_read": true,
+            "is_starred": false,
+            "size_estimate": 2048,
+            "created_at": "2024-01-15T10:30:00Z"
+          }
+        },
+        "response_error": {
+          "status_code": 404,
+          "body": {
+            "detail": "Email not found"
+          }
+        }
+      },
+      "5_star_email": {
+        "method": "POST",
+        "url": "/emails/{email_id}/star",
+        "full_url": "http://localhost:8000/api/v1/gmail/emails/email_123/star",
+        "description": "Toggle email star status",
+        "headers": {
+          "Authorization": "Bearer {jwt_token}"
+        },
+        "path_params": {
+          "email_id": "email_123"
+        },
+        "request_body": "No body required",
+        "request_example": {
+          "curl": "curl -X POST 'http://localhost:8000/api/v1/gmail/emails/email_123/star' -H 'Authorization: Bearer {token}'",
+          "javascript": "fetch('/api/v1/gmail/emails/email_123/star', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } })"
+        },
+        "response_success": {
+          "status_code": 200,
+          "body": {
+            "starred": true,
+            "message": "Email starred"
+          }
+        }
+      },
+      "6_sync_emails": {
+        "method": "POST",
+        "url": "/sync",
+        "full_url": "http://localhost:8000/api/v1/gmail/sync",
+        "description": "Manually sync recent emails from Gmail",
+        "headers": {
+          "Authorization": "Bearer {jwt_token}"
+        },
+        "query_params": {
+          "max_results": "20 (optional, 1-100)"
+        },
+        "request_body": "No body required",
+        "request_example": {
+          "curl": "curl -X POST 'http://localhost:8000/api/v1/gmail/sync?max_results=20' -H 'Authorization: Bearer {token}'",
+          "javascript": "fetch('/api/v1/gmail/sync?max_results=20', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } })"
+        },
+        "response_success": {
+          "status_code": 200,
+          "body": {
+            "message": "Synced 15 emails",
+            "synced_count": 15
+          }
+        },
+        "response_error": {
+          "status_code": 401,
+          "body": {
+            "detail": "User not authenticated with Gmail"
+          }
+        }
+      },
+      "7_start_watch": {
+        "method": "POST",
+        "url": "/watch",
+        "full_url": "http://localhost:8000/api/v1/gmail/watch",
+        "description": "Start watching emails for push notifications",
+        "headers": {
+          "Authorization": "Bearer {jwt_token}"
+        },
+        "request_body": "No body required",
+        "response_success": {
+          "status_code": 200,
+          "body": {
+            "status": "watch_started",
+            "expiration": "1640995200000"
+          }
+        }
+      },
+      "8_websocket": {
+        "protocol": "WebSocket",
+        "url": "ws://localhost:8000/api/v1/gmail/ws/{user_id}",
+        "description": "Real-time email notifications",
+        "connection_example": {
+          "javascript": "const ws = new WebSocket('ws://localhost:8000/api/v1/gmail/ws/' + userId);"
+        },
+        "message_types": {
+          "connection_established": {
+            "type": "connection_established",
+            "data": {
+              "user_id": "user_123",
+              "timestamp": "2024-01-15T10:30:00Z"
+            }
+          },
+          "new_email": {
+            "type": "new_email",
+            "data": {
+              "id": "email_456",
+              "subject": "New Email Subject",
+              "from_email": "sender@example.com",
+              "snippet": "Email preview text..."
+            }
+          },
+          "heartbeat": {
+            "type": "heartbeat",
+            "data": {
+              "timestamp": "2024-01-15T10:30:00Z"
+            }
+          }
+        }
+      }
+    },
+    "implementation_flow": {
+      "step_1": {
+        "title": "Connect Gmail with Email Input",
+        "action": "Show email input form, then redirect to /auth endpoint",
+        "code": "const email = document.getElementById('gmail-email').value; window.location.href = '/api/v1/gmail/auth' + (email ? '?email=' + encodeURIComponent(email) : '');"
+      },
+      "step_2": {
+        "title": "Handle OAuth Callback",
+        "action": "OAuth callback handled automatically by backend",
+        "note": "User will be redirected back to your app after consent"
+      },
+      "step_3": {
+        "title": "Check Connection Status",
+        "action": "Try fetching emails to verify connection",
+        "code": "fetch('/api/v1/gmail/emails?limit=1')"
+      },
+      "step_4": {
+        "title": "Display Email List",
+        "action": "Fetch and render emails with pagination",
+        "code": "fetch('/api/v1/gmail/emails?limit=20&offset=0')"
+      },
+      "step_5": {
+        "title": "Setup Real-time Updates",
+        "action": "Connect to WebSocket for live notifications",
+        "code": "new WebSocket('ws://localhost:8000/api/v1/gmail/ws/' + userId)"
+      }
+    },
+    "error_codes": {
+      "200": "Success",
+      "302": "OAuth redirect",
+      "400": "Bad request - Invalid parameters",
+      "401": "Unauthorized - Invalid token or Gmail not connected",
+      "404": "Email not found",
+      "500": "Internal server error"
+    },
+    "ui_components_needed": {
+      "gmail_connect_form": "Form with email input and connect button",
+      "email_input": "Input field for Gmail address (optional)",
+      "connect_button": "Button to start Gmail OAuth",
+      "email_list": "Component to display paginated emails",
+      "email_detail": "Component to show full email content",
+      "star_button": "Button to star/unstar emails",
+      "sync_button": "Button to manually sync emails",
+      "notification_system": "Toast/notification for real-time updates",
+      "loading_states": "Loading indicators for async operations"
+    },
+    "ui_example_form": {
+      "html": "<form id='gmail-connect-form'><input type='email' id='gmail-email' placeholder='Enter Gmail address (optional)' /><button type='submit'>Connect Gmail</button></form>",
+      "javascript": "document.getElementById('gmail-connect-form').onsubmit = function(e) { e.preventDefault(); const email = document.getElementById('gmail-email').value; window.location.href = '/api/v1/gmail/auth' + (email ? '?email=' + encodeURIComponent(email) : ''); };"
+    }
+  }
+}

@@ -38,7 +38,8 @@ websocket_connections: Dict[str, WebSocket] = {}
 # Gmail OAuth scopes
 GMAIL_SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/userinfo.email"
+    "https://www.googleapis.com/auth/userinfo.email",
+    "openid"
 ]
 
 # ===== Authentication Helper =====
@@ -46,10 +47,21 @@ async def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depend
     """Extract user ID from JWT token."""
     token = credentials.credentials
     payload = verify_token(token)
-    user_id = payload.get("user_id") or payload.get("sub")
-    if user_id is None:
+    email = payload.get("sub")
+    
+    if email is None:
         raise HTTPException(status_code=401, detail="Could not validate credentials")
-    return user_id
+    
+    # Find the corresponding user_id in database
+    try:
+        result = supabase.table('users').select('id').eq('email', email).execute()
+        if result.data:
+            return result.data[0]['id']
+        else:
+            raise HTTPException(status_code=401, detail="User not found")
+    except Exception as e:
+        logger.error(f"Error finding user by email {email}: {e}")
+        raise HTTPException(status_code=401, detail="Could not validate user")
 
 # ===== Database Helper Functions =====
 async def get_user_gmail_token(user_id: str) -> Optional[Dict]:
@@ -71,11 +83,6 @@ async def save_user_gmail_token(user_id: str, email_address: str, refresh_token:
             'updated_at': datetime.utcnow().isoformat()
         }
         
-        if access_token:
-            token_data['access_token'] = access_token
-        if expires_at:
-            token_data['expires_at'] = expires_at.isoformat()
-            
         result = supabase.table('gmail_tokens').upsert(token_data).execute()
         return result.data[0] if result.data else None
     except Exception as e:
@@ -172,12 +179,8 @@ async def get_gmail_service(user_id: str):
         if not token_data.get('refresh_token'):
             raise HTTPException(status_code=401, detail="No valid refresh token found")
 
-        # Check if access token is still valid
-        access_token = token_data.get('access_token')
-        expires_at = token_data.get('expires_at')
-        
         creds = Credentials(
-            token=access_token,
+            token=None,  # Will be refreshed
             refresh_token=token_data['refresh_token'],
             token_uri=settings.GOOGLE_TOKEN_URI,
             client_id=settings.GOOGLE_CLIENT_ID,
@@ -185,35 +188,14 @@ async def get_gmail_service(user_id: str):
             scopes=GMAIL_SCOPES
         )
         
-        # Check if token needs refresh
-        needs_refresh = False
-        if not access_token:
-            needs_refresh = True
-        elif expires_at:
-            try:
-                exp_time = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
-                needs_refresh = exp_time <= datetime.utcnow().replace(tzinfo=exp_time.tzinfo)
-            except (ValueError, TypeError):
-                needs_refresh = True
-        
-        if needs_refresh:
-            try:
-                creds.refresh(GoogleRequest())
-                # Save updated tokens
-                new_expires_at = datetime.utcnow() + timedelta(seconds=3600)  # 1 hour default
-                await save_user_gmail_token(
-                    user_id, 
-                    token_data['email_address'], 
-                    creds.refresh_token,
-                    creds.token,
-                    new_expires_at
-                )
-            except Exception as e:
-                logger.error(f"Failed to refresh Gmail credentials for user {user_id}: {e}")
-                raise HTTPException(
-                    status_code=401, 
-                    detail="Gmail authentication expired. Please reconnect your Gmail account."
-                )
+        try:
+            creds.refresh(GoogleRequest())
+        except Exception as e:
+            logger.error(f"Failed to refresh Gmail credentials for user {user_id}: {e}")
+            raise HTTPException(
+                status_code=401, 
+                detail="Gmail authentication expired. Please reconnect your Gmail account."
+            )
         
         return build("gmail", "v1", credentials=creds)
     except HTTPException:
@@ -288,6 +270,49 @@ async def notify_new_email(user_id: str, email_data: Dict):
             print(f"Error sending WebSocket message: {e}")
             websocket_connections.pop(user_id, None)
 
+# ===== Connection Status Endpoint =====
+@router.get("/status", 
+    summary="Check Gmail Connection Status",
+    description="Check if user has Gmail connected",
+    responses={
+        200: {"description": "Connection status retrieved"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"}
+    }
+)
+async def get_gmail_status(user_id: str = Depends(get_current_user_id)):
+    """Check Gmail connection status for user."""
+    try:
+        token_data = await get_user_gmail_token(user_id)
+        if token_data and token_data.get('refresh_token'):
+            return {
+                "connected": True,
+                "email_address": token_data.get('email_address'),
+                "connected_at": token_data.get('updated_at')
+            }
+        else:
+            return {"connected": False}
+    except Exception as e:
+        logger.error(f"Error checking Gmail status: {e}")
+        return {"connected": False}
+
+@router.delete("/disconnect", 
+    summary="Disconnect Gmail",
+    description="Disconnect Gmail account for user",
+    responses={
+        200: {"description": "Successfully disconnected"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"}
+    }
+)
+async def disconnect_gmail(user_id: str = Depends(get_current_user_id)):
+    """Disconnect Gmail account for user."""
+    try:
+        # Delete Gmail tokens
+        result = supabase.table('gmail_tokens').delete().eq('user_id', user_id).execute()
+        return {"message": "Gmail account disconnected successfully"}
+    except Exception as e:
+        logger.error(f"Error disconnecting Gmail: {e}")
+        raise HTTPException(status_code=500, detail="Failed to disconnect Gmail")
+
 # ===== OAuth Endpoints =====
 @router.get("/auth", 
     summary="Start Gmail OAuth",
@@ -298,9 +323,33 @@ async def notify_new_email(user_id: str, email_data: Dict):
         500: {"model": ErrorResponse, "description": "Internal server error"}
     }
 )
-async def google_auth(user_id: str = Depends(get_current_user_id)):
+async def google_auth(
+    email: Optional[str] = Query(None, description="Gmail address to connect (optional)"),
+    token: Optional[str] = Query(None, description="JWT token for authentication")
+):
     """Start Gmail OAuth flow."""
     try:
+        # Validate token from query parameter
+        if not token:
+            raise HTTPException(status_code=401, detail="Token is required")
+        
+        payload = verify_token(token)
+        email = payload.get("sub")
+        
+        if email is None:
+            raise HTTPException(status_code=401, detail="Could not validate credentials")
+        
+        # Find the corresponding user_id in database
+        try:
+            result = supabase.table('users').select('id').eq('email', email).execute()
+            if result.data:
+                user_id = result.data[0]['id']
+            else:
+                raise HTTPException(status_code=401, detail="User not found")
+        except Exception as e:
+            logger.error(f"Error finding user by email {email}: {e}")
+            raise HTTPException(status_code=401, detail="Could not validate user")
+        
         flow = Flow.from_client_config(
             {
                 "web": {
@@ -315,12 +364,19 @@ async def google_auth(user_id: str = Depends(get_current_user_id)):
         )
         flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
 
-        auth_url, _ = flow.authorization_url(
-            access_type="offline",
-            prompt="consent",
-            include_granted_scopes="true",
-            state=user_id  # Pass user_id in state
-        )
+        # Build OAuth parameters
+        oauth_params = {
+            "access_type": "offline",
+            "prompt": "select_account consent",  # Force account selection
+            "include_granted_scopes": "true",
+            "state": user_id  # Pass user_id in state
+        }
+        
+        # Add login hint if email provided
+        if email:
+            oauth_params["login_hint"] = email
+            
+        auth_url, _ = flow.authorization_url(**oauth_params)
         return RedirectResponse(auth_url)
     except Exception as e:
         logger.error(f"Error starting Gmail OAuth: {e}")
@@ -404,11 +460,9 @@ async def google_callback(
         # Start watching emails
         await start_gmail_watch(user_id)
         
-        return GmailAuthResponse(
-            status="success",
-            email=email_address,
-            message="Gmail connected successfully"
-        )
+        # Redirect back to inbox page instead of returning JSON
+        frontend_url = "http://localhost:8080/inbox?gmail_connected=true"
+        return RedirectResponse(url=frontend_url)
     except HttpError as e:
         logger.error(f"Gmail API error in callback: {e}")
         raise HTTPException(status_code=400, detail=f"Gmail API error: {str(e)}")
