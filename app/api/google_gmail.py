@@ -461,7 +461,7 @@ async def google_callback(
         await start_gmail_watch(user_id)
         
         # Redirect back to inbox page instead of returning JSON
-        frontend_url = "http://localhost:8080/inbox?gmail_connected=true"
+        frontend_url = "https://business-brain-frontend.vercel.app/inbox?gmail_connected=true"
         return RedirectResponse(url=frontend_url)
     except HttpError as e:
         logger.error(f"Gmail API error in callback: {e}")
